@@ -1,0 +1,42 @@
+.app {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1 {
+  margin: 10px 0;
+}
+
+.graphInput {
+  width: 80%;
+  margin: 10px auto;
+  padding: 8px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  resize: none;
+}
+
+button {
+  margin: 10px auto;
+  padding: 8px 16px;
+  background-color: #0077ff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #005fcc;
+}
+
+.graphArea {
+  flex: 1;
+  margin: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
