@@ -1,10 +1,17 @@
 import { useState } from "react";
-import ReactFlow, { Node, Edge } from "reactflow";
+import ReactFlow, {
+  Background,
+  Controls,
+  useNodesState,
+  useEdgesState,
+} from "reactflow";
+import type { Node, Edge } from "reactflow";
 import style from "./App.module.css";
+import "reactflow/dist/style.css";
 
 export default function App() {
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [input, setInput] = useState<string>("");
 
   const handleBuildGraph = () => {
@@ -19,7 +26,20 @@ export default function App() {
         parsedNodes = nodeLabels.map((label, i) => ({
           id: label.trim(),
           position: { x: 150 * (i + 1), y: 100 + idx * 50 },
-          data: { label: label.trim() },
+          data: { label: label.trim(), title: label.trim() },
+          style: {
+            background: "#0178ff",
+            color: "white",
+            borderRadius: "100%",
+            width: 50,
+            height: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "12px",
+            textAlign: "center",
+            overflow: "hidden",
+          },
         }));
       }
 
@@ -31,6 +51,8 @@ export default function App() {
             id: `e${i}`,
             source: source.trim(),
             target: target.trim(),
+            style: { stroke: "#ff6600", strokeWidth: 2 },
+            type: "smoothstep",
           };
         });
       }
@@ -55,7 +77,16 @@ export default function App() {
       <button onClick={handleBuildGraph}>Build Graph</button>
 
       <div className={style.graphArea}>
-        <ReactFlow nodes={nodes} edges={edges} fitView />
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          fitView
+        >
+          <Background color="#000" gap={20} />
+          <Controls />
+        </ReactFlow>
       </div>
     </div>
   );
