@@ -9,29 +9,31 @@ import type { Node, Edge } from "reactflow";
 import style from "./App.module.css";
 import "reactflow/dist/style.css";
 
-import dagre from "dagre";
+import ELK from "elkjs/lib/elk.bundled.js";
 
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
+const elk = new ELK();
 
-function getLayoutedElements(nodes: Node[], edges: Edge[]) {
-  dagreGraph.setGraph({ rankdir: "LR" }); // TB = top-bottom, LR = left-right
+async function getElkLayout(nodes: Node[], edges: Edge[]) {
+  const graph = {
+    id: "root",
+    layoutOptions: { "elk.algorithm": "layered" },
+    children: nodes.map((n) => ({ id: n.id, width: 80, height: 80 })),
+    edges: edges.map((e) => ({
+      id: e.id,
+      sources: [e.source],
+      targets: [e.target],
+    })),
+  };
 
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: 80, height: 80 });
-  });
+  const layout = await elk.layout(graph);
 
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  dagre.layout(dagreGraph);
-
-  return nodes.map((node) => {
-    const pos = dagreGraph.node(node.id);
-    node.position = { x: pos.x, y: pos.y };
-    return node;
-  });
+  return {
+    nodes: nodes.map((n) => {
+      const pos = layout.children?.find((c) => c.id === n.id);
+      return { ...n, position: { x: pos?.x ?? 0, y: pos?.y ?? 0 } };
+    }),
+    edges,
+  };
 }
 
 export default function App() {
@@ -39,7 +41,7 @@ export default function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [input, setInput] = useState<string>("");
 
-  const handleBuildGraph = () => {
+  const handleBuildGraph = async () => {
     const lines = input.split("\n").map((line) => line.trim());
 
     let parsedNodes: Node[] = [];
@@ -77,15 +79,19 @@ export default function App() {
             source: source.trim(),
             target: target.trim(),
             style: { stroke: "#ff6600", strokeWidth: 2 },
-            type: "smoothstep",
+            type: "straight",
           };
         });
       }
     });
 
-    const layouted = getLayoutedElements(parsedNodes, parsedEdges);
-    setNodes(layouted);
-    setEdges(parsedEdges);
+    const { nodes: layoutedNodes, edges: layoutedEdges } = await getElkLayout(
+      parsedNodes,
+      parsedEdges
+    );
+
+    setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
   };
 
   return (
