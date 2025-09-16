@@ -40,3 +40,19 @@ button:hover {
   border: 1px solid #ccc;
   border-radius: 6px;
 }
+
+.center {
+  display: flex;
+}
+.nodeInputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, clamp(10px, 5vw, 400px));
+  gap: 10px;
+
+  /* use clamp for centering with margins */
+  margin-left: clamp(10px, 5vw, 400px);
+  margin-right: clamp(10px, 5vw, 400px);
+}
+.nodeInputs input {
+  padding: 6px;
+}

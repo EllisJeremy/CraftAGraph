@@ -11,7 +11,7 @@ export default function CircleNode({ data }: NodeProps<CircleNodeData>) {
       style={{
         background: "#0178ff",
         color: "white",
-
+        borderRadius: "50%",
         width: 50,
         height: 50,
         display: "flex",

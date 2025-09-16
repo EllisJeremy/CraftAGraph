@@ -16,52 +16,65 @@ const nodeTypes = { circle: CircleNode };
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [input, setInput] = useState<string>("");
 
+  // dynamic form state
+  const [nodeInputs, setNodeInputs] = useState<string[]>([""]);
+  const [edgeInputs, setEdgeInputs] = useState<
+    { source: string; target: string }[]
+  >([{ source: "", target: "" }]);
+
+  // handle node input change
+  const updateNode = (index: number, value: string) => {
+    const updated = [...nodeInputs];
+    updated[index] = value;
+    setNodeInputs(updated);
+
+    // add new empty row if last one is filled
+    if (index === nodeInputs.length - 1 && value.trim() !== "") {
+      setNodeInputs([...updated, ""]);
+    }
+  };
+
+  // handle edge input change
+  const updateEdge = (
+    index: number,
+    field: "source" | "target",
+    value: string
+  ) => {
+    const updated = [...edgeInputs];
+    updated[index][field] = value;
+    setEdgeInputs(updated);
+
+    // add new row if last row is fully filled
+    if (
+      index === edgeInputs.length - 1 &&
+      updated[index].source.trim() !== "" &&
+      updated[index].target.trim() !== ""
+    ) {
+      setEdgeInputs([...updated, { source: "", target: "" }]);
+    }
+  };
+
+  // build graph
   const handleBuildGraph = async () => {
-    const lines = input.split("\n").map((line) => line.trim());
+    const parsedNodes: Node[] = nodeInputs
+      .filter((n) => n.trim() !== "")
+      .map((label, i) => ({
+        id: label.trim(),
+        type: "circle",
+        position: { x: 100 + i * 100, y: 100 },
+        data: { label: label.slice(0, 7), title: label },
+      }));
 
-    let parsedNodes: Node[] = [];
-    let parsedEdges: Edge[] = [];
-
-    lines.forEach((line, idx) => {
-      if (line.startsWith("Nodes:")) {
-        const nodeLabels = line.replace("Nodes:", "").split(",");
-        parsedNodes = nodeLabels.map((label, i) => ({
-          id: label.trim(),
-          type: "circle",
-          position: { x: 150 * (i + 1), y: 100 + idx * 50 },
-          data: { label: label.slice(0, 7), title: label },
-          style: {
-            background: "#0178ff",
-            color: "white",
-            borderRadius: "100%",
-            width: 50,
-            height: 50,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "12px",
-            textAlign: "center",
-            overflow: "hidden",
-          },
-        }));
-      }
-
-      if (line.startsWith("Edges:")) {
-        const edgeDefs = line.replace("Edges:", "").split(",");
-        parsedEdges = edgeDefs.map((pair, i) => {
-          const [source, target] = pair.split("-");
-          return {
-            id: `e${i}`,
-            source: source.trim(),
-            target: target.trim(),
-            style: { stroke: "#ff6600", strokeWidth: 2 },
-            type: "straight",
-          };
-        });
-      }
-    });
+    const parsedEdges: Edge[] = edgeInputs
+      .filter((e) => e.source.trim() !== "" && e.target.trim() !== "")
+      .map((e, i) => ({
+        id: `e${i}`,
+        source: e.source.trim(),
+        target: e.target.trim(),
+        style: { stroke: "#ff6600", strokeWidth: 2 },
+        type: "smoothstep",
+      }));
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = await nodeLayout(
       parsedNodes,
@@ -76,13 +89,39 @@ export default function App() {
     <div className={style.app}>
       <h1>Craft a Graph</h1>
 
-      <textarea
-        className={style.graphInput}
-        rows={5}
-        placeholder={"Nodes: A, B, C\nEdges: A-B, B-C"}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-      />
+      <h3>Nodes</h3>
+      <div className={style.nodeInputs}>
+        {nodeInputs.map((value, i) => (
+          <input
+            key={i}
+            value={value}
+            onChange={(e) => updateNode(i, e.target.value)}
+            placeholder={`Node ${i + 1}`}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                updateNode(i, value);
+              }
+            }}
+          />
+        ))}
+      </div>
+
+      <h3>Edges</h3>
+      {edgeInputs.map((edge, i) => (
+        <div key={i} style={{ display: "flex", gap: "8px" }}>
+          <input
+            value={edge.source}
+            onChange={(e) => updateEdge(i, "source", e.target.value)}
+            placeholder="Source"
+          />
+          <input
+            value={edge.target}
+            onChange={(e) => updateEdge(i, "target", e.target.value)}
+            placeholder="Target"
+          />
+        </div>
+      ))}
 
       <button onClick={handleBuildGraph}>Build Graph</button>
 
