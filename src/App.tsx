@@ -9,34 +9,9 @@ import type { Node, Edge } from "reactflow";
 import style from "./App.module.css";
 import "reactflow/dist/style.css";
 import CircleNode from "./components/sideNode";
+import nodeLayout from "./fucntions/nodeLayout";
 
-import ELK from "elkjs/lib/elk.bundled.js";
-
-const elk = new ELK();
 const nodeTypes = { circle: CircleNode };
-
-async function getElkLayout(nodes: Node[], edges: Edge[]) {
-  const graph = {
-    id: "root",
-    layoutOptions: { "elk.algorithm": "layered" },
-    children: nodes.map((n) => ({ id: n.id, width: 80, height: 80 })),
-    edges: edges.map((e) => ({
-      id: e.id,
-      sources: [e.source],
-      targets: [e.target],
-    })),
-  };
-
-  const layout = await elk.layout(graph);
-
-  return {
-    nodes: nodes.map((n) => {
-      const pos = layout.children?.find((c) => c.id === n.id);
-      return { ...n, position: { x: pos?.x ?? 0, y: pos?.y ?? 0 } };
-    }),
-    edges,
-  };
-}
 
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -88,7 +63,7 @@ export default function App() {
       }
     });
 
-    const { nodes: layoutedNodes, edges: layoutedEdges } = await getElkLayout(
+    const { nodes: layoutedNodes, edges: layoutedEdges } = await nodeLayout(
       parsedNodes,
       parsedEdges
     );
@@ -99,7 +74,7 @@ export default function App() {
 
   return (
     <div className={style.app}>
-      <h1>Graph Builder</h1>
+      <h1>Craft a Graph</h1>
 
       <textarea
         className={style.graphInput}
