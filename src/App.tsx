@@ -6,8 +6,9 @@ import ReactFlow, {
   useEdgesState,
 } from "reactflow";
 import type { Node, Edge } from "reactflow";
-import style from "./App.module.css";
 import "reactflow/dist/style.css";
+import style from "./App.module.css";
+
 import CircleNode from "./components/sideNode";
 import nodeLayout from "./fucntions/nodeLayout";
 
@@ -19,9 +20,7 @@ export default function App() {
 
   // dynamic form state
   const [nodeInputs, setNodeInputs] = useState<string[]>([""]);
-  const [edgeInputs, setEdgeInputs] = useState<
-    { source: string; target: string }[]
-  >([{ source: "", target: "" }]);
+  const [edgeInputs, setEdgeInputs] = useState<{ [key: string]: string[] }>({});
 
   // handle node input change
   const updateNode = (index: number, value: string) => {
@@ -29,29 +28,22 @@ export default function App() {
     updated[index] = value;
     setNodeInputs(updated);
 
-    // add new empty row if last one is filled
+    // auto-add new node row if last one is filled
     if (index === nodeInputs.length - 1 && value.trim() !== "") {
       setNodeInputs([...updated, ""]);
     }
   };
 
-  // handle edge input change
-  const updateEdge = (
-    index: number,
-    field: "source" | "target",
-    value: string
-  ) => {
-    const updated = [...edgeInputs];
-    updated[index][field] = value;
+  // handle edge input change for adjacency list
+  const updateTarget = (node: string, index: number, value: string) => {
+    const targets = edgeInputs[node] ? [...edgeInputs[node]] : [];
+    targets[index] = value;
+    const updated = { ...edgeInputs, [node]: targets };
     setEdgeInputs(updated);
 
-    // add new row if last row is fully filled
-    if (
-      index === edgeInputs.length - 1 &&
-      updated[index].source.trim() !== "" &&
-      updated[index].target.trim() !== ""
-    ) {
-      setEdgeInputs([...updated, { source: "", target: "" }]);
+    // auto-add empty input if last is filled
+    if (index === targets.length - 1 && value.trim() !== "") {
+      setEdgeInputs({ ...updated, [node]: [...targets, ""] });
     }
   };
 
@@ -66,15 +58,18 @@ export default function App() {
         data: { label: label.slice(0, 7), title: label },
       }));
 
-    const parsedEdges: Edge[] = edgeInputs
-      .filter((e) => e.source.trim() !== "" && e.target.trim() !== "")
-      .map((e, i) => ({
-        id: `e${i}`,
-        source: e.source.trim(),
-        target: e.target.trim(),
-        style: { stroke: "#ff6600", strokeWidth: 2 },
-        type: "smoothstep",
-      }));
+    const parsedEdges: Edge[] = Object.entries(edgeInputs).flatMap(
+      ([source, targets], i) =>
+        targets
+          .filter((t) => t.trim() !== "")
+          .map((target, j) => ({
+            id: `e${i}-${j}`,
+            source,
+            target: target.trim(),
+            style: { stroke: "#ff6600", strokeWidth: 2 },
+            type: "smoothstep",
+          }))
+    );
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = await nodeLayout(
       parsedNodes,
@@ -89,6 +84,7 @@ export default function App() {
     <div className={style.app}>
       <h1>Craft a Graph</h1>
 
+      {/* Node Inputs */}
       <h3>Nodes</h3>
       <div className={style.nodeInputs}>
         {nodeInputs.map((value, i) => (
@@ -107,24 +103,35 @@ export default function App() {
         ))}
       </div>
 
+      {/* Edges under each node (adjacency list style) */}
       <h3>Edges</h3>
-      {edgeInputs.map((edge, i) => (
-        <div key={i} style={{ display: "flex", gap: "8px" }}>
-          <input
-            value={edge.source}
-            onChange={(e) => updateEdge(i, "source", e.target.value)}
-            placeholder="Source"
-          />
-          <input
-            value={edge.target}
-            onChange={(e) => updateEdge(i, "target", e.target.value)}
-            placeholder="Target"
-          />
-        </div>
-      ))}
+      <div className={style.adjacencyGrid}>
+        {nodeInputs
+          .filter((n) => n.trim() !== "")
+          .map((node, i) => (
+            <div key={i} className={style.adjacencyColumn}>
+              <div className={style.nodeHeader}>{node}</div>
+              {(edgeInputs[node] || [""]).map((target, j) => (
+                <input
+                  key={j}
+                  value={target}
+                  onChange={(e) => updateTarget(node, j, e.target.value)}
+                  placeholder="Target"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      updateTarget(node, j, target);
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          ))}
+      </div>
 
       <button onClick={handleBuildGraph}>Build Graph</button>
 
+      {/* Graph */}
       <div className={style.graphArea}>
         <ReactFlow
           nodes={nodes}
