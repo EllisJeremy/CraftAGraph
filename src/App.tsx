@@ -9,6 +9,31 @@ import type { Node, Edge } from "reactflow";
 import style from "./App.module.css";
 import "reactflow/dist/style.css";
 
+import dagre from "dagre";
+
+const dagreGraph = new dagre.graphlib.Graph();
+dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+function getLayoutedElements(nodes: Node[], edges: Edge[]) {
+  dagreGraph.setGraph({ rankdir: "LR" }); // TB = top-bottom, LR = left-right
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: 80, height: 80 });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  return nodes.map((node) => {
+    const pos = dagreGraph.node(node.id);
+    node.position = { x: pos.x, y: pos.y };
+    return node;
+  });
+}
+
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -26,7 +51,7 @@ export default function App() {
         parsedNodes = nodeLabels.map((label, i) => ({
           id: label.trim(),
           position: { x: 150 * (i + 1), y: 100 + idx * 50 },
-          data: { label: label.trim(), title: label.trim() },
+          data: { label: label.slice(0, 7), title: label },
           style: {
             background: "#0178ff",
             color: "white",
@@ -58,7 +83,8 @@ export default function App() {
       }
     });
 
-    setNodes(parsedNodes);
+    const layouted = getLayoutedElements(parsedNodes, parsedEdges);
+    setNodes(layouted);
     setEdges(parsedEdges);
   };
 
