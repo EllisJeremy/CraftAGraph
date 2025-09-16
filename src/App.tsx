@@ -8,10 +8,12 @@ import ReactFlow, {
 import type { Node, Edge } from "reactflow";
 import style from "./App.module.css";
 import "reactflow/dist/style.css";
+import CircleNode from "./components/sideNode";
 
 import ELK from "elkjs/lib/elk.bundled.js";
 
 const elk = new ELK();
+const nodeTypes = { circle: CircleNode };
 
 async function getElkLayout(nodes: Node[], edges: Edge[]) {
   const graph = {
@@ -52,6 +54,7 @@ export default function App() {
         const nodeLabels = line.replace("Nodes:", "").split(",");
         parsedNodes = nodeLabels.map((label, i) => ({
           id: label.trim(),
+          type: "circle",
           position: { x: 150 * (i + 1), y: 100 + idx * 50 },
           data: { label: label.slice(0, 7), title: label },
           style: {
@@ -115,6 +118,7 @@ export default function App() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           fitView
+          nodeTypes={nodeTypes}
         >
           <Background color="#000" gap={20} />
           <Controls />
