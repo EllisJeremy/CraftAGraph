@@ -84,49 +84,41 @@ export default function App() {
     <div className={style.app}>
       <h1>Craft a Graph</h1>
 
-      {/* Node Inputs */}
-      <h3>Nodes</h3>
-      <div className={style.nodeInputs}>
-        {nodeInputs.map((value, i) => (
-          <input
-            key={i}
-            value={value}
-            onChange={(e) => updateNode(i, e.target.value)}
-            placeholder={`Node ${i + 1}`}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                updateNode(i, value);
-              }
-            }}
-          />
-        ))}
-      </div>
-
       {/* Edges under each node (adjacency list style) */}
-      <h3>Edges</h3>
+      <h3>vertices</h3>
       <div className={style.adjacencyGrid}>
-        {nodeInputs
-          .filter((n) => n.trim() !== "")
-          .map((node, i) => (
-            <div key={i} className={style.adjacencyColumn}>
-              <div className={style.nodeHeader}>{node}</div>
-              {(edgeInputs[node] || [""]).map((target, j) => (
-                <input
-                  key={j}
-                  value={target}
-                  onChange={(e) => updateTarget(node, j, e.target.value)}
-                  placeholder="Target"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      updateTarget(node, j, target);
-                    }
-                  }}
-                />
-              ))}
-            </div>
-          ))}
+        {nodeInputs.map((node, i) => (
+          <div key={i} className={style.adjacencyColumn}>
+            {/* node name input at top */}
+            <input
+              value={node}
+              onChange={(e) => updateNode(i, e.target.value)}
+              placeholder={`Node ${i + 1}`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  updateNode(i, node);
+                }
+              }}
+            />
+
+            {/* edges directly below */}
+            {(edgeInputs[node] || [""]).map((target, j) => (
+              <input
+                key={j}
+                value={target}
+                onChange={(e) => updateTarget(node, j, e.target.value)}
+                placeholder="Target"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    updateTarget(node, j, target);
+                  }
+                }}
+              />
+            ))}
+          </div>
+        ))}
       </div>
 
       <button onClick={handleBuildGraph}>Build Graph</button>

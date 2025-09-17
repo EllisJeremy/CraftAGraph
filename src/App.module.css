@@ -70,3 +70,31 @@ button:hover {
   font-weight: bold;
   margin-bottom: 5px;
 }
+
+.adjacencyGrid {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 20px auto;
+}
+
+.adjacencyColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.adjacencyColumn input {
+  padding: 6px;
+  width: 100px;
+  text-align: center;
+}
+
+/* optional rotated label on left side */
+.adjacencyLabel {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-weight: bold;
+  margin-right: 10px;
+}
