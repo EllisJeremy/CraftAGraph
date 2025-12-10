@@ -1,142 +1,254 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import ReactFlow, {
   Background,
   Controls,
   useNodesState,
   useEdgesState,
+  addEdge,
+  Connection,
+  ReactFlowProvider,
+  useReactFlow,
+  Handle,
+  Position,
 } from "reactflow";
 import type { Node, Edge } from "reactflow";
 import "reactflow/dist/style.css";
 import style from "./App.module.css";
 
-import CircleNode from "./components/sideNode";
-import nodeLayout from "./fucntions/nodeLayout";
+// Custom Circle Node Component
+const CircleNode = ({
+  data,
+  id,
+}: {
+  data: {
+    label: string;
+    title: string;
+    color: string;
+    onLabelChange: (id: string, label: string) => void;
+  };
+  id: string;
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(data.label);
+
+  const handleDoubleClick = () => {
+    setIsEditing(true);
+  };
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    if (editValue.trim()) {
+      data.onLabelChange(id, editValue.trim());
+    } else {
+      setEditValue(data.label);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleBlur();
+    }
+  };
+
+  return (
+    <>
+      <Handle type="target" position={Position.Top} id="top" />
+      <Handle type="target" position={Position.Left} id="left" />
+      <Handle type="target" position={Position.Right} id="right" />
+      <Handle type="target" position={Position.Bottom} id="bottom" />
+      <div
+        style={{
+          width: 60,
+          height: 60,
+          borderRadius: "50%",
+          background: data.color,
+          border: "3px solid #fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          fontWeight: "bold",
+          fontSize: "14px",
+          boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
+        }}
+        title={data.title}
+        onDoubleClick={handleDoubleClick}
+      >
+        {isEditing ? (
+          <input
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            style={{
+              width: "50px",
+              textAlign: "center",
+              background: "transparent",
+              border: "none",
+              color: "#fff",
+              fontWeight: "bold",
+              fontSize: "14px",
+              outline: "none",
+            }}
+          />
+        ) : (
+          data.label
+        )}
+      </div>
+      <Handle type="source" position={Position.Top} id="top-source" />
+      <Handle type="source" position={Position.Left} id="left-source" />
+      <Handle type="source" position={Position.Right} id="right-source" />
+      <Handle type="source" position={Position.Bottom} id="bottom-source" />
+    </>
+  );
+};
 
 const nodeTypes = { circle: CircleNode };
 
-export default function App() {
+function GraphBuilder() {
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [nodeIdCounter, setNodeIdCounter] = useState(1);
+  const [selectedColor, setSelectedColor] = useState("#667eea");
+  const { screenToFlowPosition } = useReactFlow();
 
-  // dynamic form state
-  const [nodeInputs, setNodeInputs] = useState<string[]>([""]);
-  const [edgeInputs, setEdgeInputs] = useState<{ [key: string]: string[] }>({});
+  const colors = [
+    { name: "Purple", value: "#667eea" },
+    { name: "Red", value: "#ef4444" },
+    { name: "Green", value: "#22c55e" },
+    { name: "Blue", value: "#3b82f6" },
+    { name: "Orange", value: "#f97316" },
+  ];
 
-  // handle node input change
-  const updateNode = (index: number, value: string) => {
-    const updated = [...nodeInputs];
-    updated[index] = value;
-    setNodeInputs(updated);
+  const handleLabelChange = useCallback(
+    (nodeId: string, newLabel: string) => {
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, label: newLabel } }
+            : node
+        )
+      );
+    },
+    [setNodes]
+  );
 
-    // auto-add new node row if last one is filled
-    if (index === nodeInputs.length - 1 && value.trim() !== "") {
-      setNodeInputs([...updated, ""]);
-    }
-  };
-
-  // handle edge input change for adjacency list
-  const updateTarget = (node: string, index: number, value: string) => {
-    const targets = edgeInputs[node] ? [...edgeInputs[node]] : [];
-    targets[index] = value;
-    const updated = { ...edgeInputs, [node]: targets };
-    setEdgeInputs(updated);
-
-    // auto-add empty input if last is filled
-    if (index === targets.length - 1 && value.trim() !== "") {
-      setEdgeInputs({ ...updated, [node]: [...targets, ""] });
-    }
-  };
-
-  // build graph
-  const handleBuildGraph = async () => {
-    const parsedNodes: Node[] = nodeInputs
-      .filter((n) => n.trim() !== "")
-      .map((label, i) => ({
-        id: label.trim(),
-        type: "circle",
-        position: { x: 100 + i * 100, y: 100 },
-        data: { label: label.slice(0, 7), title: label },
-      }));
-
-    const parsedEdges: Edge[] = Object.entries(edgeInputs).flatMap(
-      ([source, targets], i) =>
-        targets
-          .filter((t) => t.trim() !== "")
-          .map((target, j) => ({
-            id: `e${i}-${j}`,
-            source,
-            target: target.trim(),
+  const onConnect = useCallback(
+    (params: Connection) =>
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...params,
             style: { stroke: "#ff6600", strokeWidth: 2 },
-            type: "smoothstep",
-          }))
-    );
+            type: "straight",
+          },
+          eds
+        )
+      ),
+    [setEdges]
+  );
 
-    const { nodes: layoutedNodes, edges: layoutedEdges } = await nodeLayout(
-      parsedNodes,
-      parsedEdges
-    );
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
 
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      if (!reactFlowWrapper.current) return;
+
+      const color = event.dataTransfer.getData("application/reactflow-color");
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      const newNode: Node = {
+        id: `node-${nodeIdCounter}`,
+        type: "circle",
+        position,
+        data: {
+          label: `${nodeIdCounter}`,
+          title: `Node ${nodeIdCounter}`,
+          color: color || selectedColor,
+          onLabelChange: handleLabelChange,
+        },
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+      setNodeIdCounter((id) => id + 1);
+    },
+    [nodeIdCounter, screenToFlowPosition, setNodes, selectedColor]
+  );
+
+  const onDragStart = (event: React.DragEvent, color: string) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/reactflow-color", color);
+    setSelectedColor(color);
   };
 
   return (
     <div className={style.app}>
       <h1>Craft a Graph</h1>
 
-      {/* Edges under each node (adjacency list style) */}
-      <h3>vertices</h3>
-      <div className={style.adjacencyGrid}>
-        {nodeInputs.map((node, i) => (
-          <div key={i} className={style.adjacencyColumn}>
-            {/* node name input at top */}
-            <input
-              value={node}
-              onChange={(e) => updateNode(i, e.target.value)}
-              placeholder={`Node ${i + 1}`}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  updateNode(i, node);
-                }
-              }}
-            />
+      <ul className={style.instructions}>
+        <li>
+          Drag a colored node below onto the canvas. Double-click nodes to edit
+        </li>
+        <li>Connect nodes by dragging from one node's edge to another.</li>
+        <li>
+          To remove a node or connection, click on it then hit the delete key.
+        </li>
+      </ul>
 
-            {/* edges directly below */}
-            {(edgeInputs[node] || [""]).map((target, j) => (
-              <input
-                key={j}
-                value={target}
-                onChange={(e) => updateTarget(node, j, e.target.value)}
-                placeholder="Target"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    updateTarget(node, j, target);
-                  }
-                }}
-              />
-            ))}
+      <div className={style.colorNodes}>
+        {colors.map((color) => (
+          <div
+            key={color.value}
+            draggable
+            onDragStart={(e) => onDragStart(e, color.value)}
+            className={style.dragNode}
+            style={{
+              background: color.value,
+            }}
+            title={color.name}
+          >
+            +
           </div>
         ))}
       </div>
 
-      <button onClick={handleBuildGraph}>Build Graph</button>
-
-      {/* Graph */}
-      <div className={style.graphArea}>
+      <div className={style.graphArea} ref={reactFlowWrapper}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          fitView
+          onConnect={onConnect}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
           nodeTypes={nodeTypes}
+          fitView
+          deleteKeyCode="Delete"
         >
           <Background color="#000" gap={20} />
           <Controls />
         </ReactFlow>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <GraphBuilder />
+    </ReactFlowProvider>
   );
 }
