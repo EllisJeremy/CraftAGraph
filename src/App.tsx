@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { flushSync } from "react-dom";
 import ReactFlow, {
   Background,
   Controls,
@@ -144,20 +145,42 @@ function GraphBuilder() {
   const [selectedFreePathId, setSelectedFreePathId] = useState<string | null>(
     null,
   );
+  const selectedFreePathIdRef = useRef<string | null>(null);
+  selectedFreePathIdRef.current = selectedFreePathId;
   const isDrawing = useRef(false);
 
   useEffect(() => {
+    const isTyping = () => document.activeElement?.tagName === "INPUT";
+
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedFreePathId) {
-        setFreePaths((paths) =>
-          paths.filter((p) => p.id !== selectedFreePathId),
-        );
+      if (isTyping()) return;
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedFreePathIdRef.current) {
+        const id = selectedFreePathIdRef.current;
+        setFreePaths((paths) => paths.filter((p) => p.id !== id));
         setSelectedFreePathId(null);
       }
+      if (e.key === "d" && !e.repeat) {
+        setFreeDrawMode(true);
+      }
     };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "d") {
+        isDrawing.current = false;
+        flushSync(() => {
+          setFreeDrawMode(false);
+          setCurrentPath(null);
+        });
+      }
+    };
+
     window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [selectedFreePathId]);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, []);
 
   const colors = [
     { name: "Purple", value: "#667eea" },
@@ -182,6 +205,7 @@ function GraphBuilder() {
 
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
+      setSelectedFreePathId(null);
       const current = connectingFromRef.current;
       if (!current) {
         connectingFromRef.current = node.id;
@@ -216,6 +240,7 @@ function GraphBuilder() {
       setEdges((eds) => eds.map((e) => ({ ...e, selected: e.id === edge.id })));
       connectingFromRef.current = null;
       setConnectingFrom(null);
+      setSelectedFreePathId(null);
     },
     [setEdges],
   );
@@ -224,7 +249,44 @@ function GraphBuilder() {
     setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
     connectingFromRef.current = null;
     setConnectingFrom(null);
+    setSelectedFreePathId(null);
   }, [setEdges]);
+
+  const onNodeDragStop = useCallback(
+    (_event: React.MouseEvent, draggedNode: Node) => {
+      const THRESHOLD = 50; // flow-space px — how close a path point must be to a node center
+      const nodeCenter = (n: Node) => ({ x: n.position.x + 30, y: n.position.y + 30 });
+      const pathNear = (fp: FreePath, pt: { x: number; y: number }) =>
+        fp.points.some((p) => Math.hypot(p.x - pt.x, p.y - pt.y) < THRESHOLD);
+
+      const draggedCenter = nodeCenter(draggedNode);
+      const toRemove: string[] = [];
+      const newEdges: Parameters<typeof addEdge>[0][] = [];
+
+      for (const fp of freePaths) {
+        if (!pathNear(fp, draggedCenter)) continue;
+        const other = nodes.find(
+          (n) => n.id !== draggedNode.id && pathNear(fp, nodeCenter(n)),
+        );
+        if (other) {
+          toRemove.push(fp.id);
+          newEdges.push({
+            id: `e-${draggedNode.id}-${other.id}`,
+            source: draggedNode.id,
+            target: other.id,
+            style: { stroke: "#000", strokeWidth: 2 },
+            type: "straight",
+          });
+        }
+      }
+
+      if (toRemove.length > 0)
+        setFreePaths((paths) => paths.filter((p) => !toRemove.includes(p.id)));
+      if (newEdges.length > 0)
+        setEdges((eds) => newEdges.reduce((acc, e) => addEdge(e, acc), eds));
+    },
+    [freePaths, nodes, setEdges],
+  );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -316,6 +378,7 @@ function GraphBuilder() {
         <li>
           To remove a node or connection, click on it then hit the delete key.
         </li>
+        <li>Hold <strong>D</strong> to free-draw annotation lines.</li>
       </ul>
 
       <div className={style.colorNodes}>
@@ -333,16 +396,6 @@ function GraphBuilder() {
             +
           </div>
         ))}
-        <button
-          onClick={() => setFreeDrawMode((m) => !m)}
-          style={{
-            background: freeDrawMode ? "#f97316" : undefined,
-            alignSelf: "center",
-          }}
-          title="Toggle free draw mode"
-        >
-          {freeDrawMode ? "✏️ Drawing" : "✏️ Draw"}
-        </button>
       </div>
 
       <div
@@ -364,6 +417,7 @@ function GraphBuilder() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={freeDrawMode ? undefined : onNodeClick}
+          onNodeDragStop={onNodeDragStop}
           onEdgeClick={onEdgeClick}
           onPaneClick={onPaneClick}
           onDrop={onDrop}
@@ -409,7 +463,7 @@ function GraphBuilder() {
             {freePaths.map((fp) => (
               <g
                 key={fp.id}
-                style={{ cursor: "pointer" }}
+                style={{ cursor: freeDrawMode ? "crosshair" : "pointer" }}
                 onClick={() =>
                   setSelectedFreePathId((cur) => (cur === fp.id ? null : fp.id))
                 }
@@ -422,7 +476,7 @@ function GraphBuilder() {
                   strokeWidth={12 / zoom}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  style={{ pointerEvents: "stroke" }}
+                  style={{ pointerEvents: freeDrawMode ? "none" : "stroke" }}
                 />
                 {/* Visible stroke */}
                 <path
