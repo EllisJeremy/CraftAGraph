@@ -28,7 +28,6 @@ const hiddenHandle: React.CSSProperties = {
   transform: "none",
 };
 
-// Custom Circle Node Component
 const CircleNode = ({
   data,
   id,
@@ -169,7 +168,7 @@ function GraphBuilder() {
             id: `e-${current}-${node.id}`,
             source: current,
             target: node.id,
-            style: { stroke: "#ff6600", strokeWidth: 2 },
+            style: { stroke: "#000", strokeWidth: 2 },
             type: "straight",
           },
           eds,
@@ -180,6 +179,17 @@ function GraphBuilder() {
     },
     [setEdges],
   );
+
+  const onEdgeClick = useCallback(
+    (_event: React.MouseEvent, edge: Edge) => {
+      setEdges((eds) => eds.map((e) => ({ ...e, selected: e.id === edge.id })));
+    },
+    [setEdges],
+  );
+
+  const onPaneClick = useCallback(() => {
+    setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
+  }, [setEdges]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -267,15 +277,22 @@ function GraphBuilder() {
             ...n,
             data: { ...n.data, isConnectingSource: n.id === connectingFrom },
           }))}
-          edges={edges}
+          edges={edges.map((e) => ({
+            ...e,
+            style: e.selected
+              ? { stroke: "#f97316", strokeWidth: 3 }
+              : { stroke: "#000", strokeWidth: 2 },
+          }))}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
+          onPaneClick={onPaneClick}
           onDrop={onDrop}
           onDragOver={onDragOver}
           nodeTypes={nodeTypes}
           fitView
-          deleteKeyCode="Delete"
+          deleteKeyCode={["Delete", "Backspace"]}
         >
           <Background color="#000" gap={20} />
           <Controls />
