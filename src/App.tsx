@@ -5,7 +5,6 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   addEdge,
-  Connection,
   ReactFlowProvider,
   useReactFlow,
   Handle,
@@ -14,6 +13,20 @@ import ReactFlow, {
 import type { Node, Edge } from "reactflow";
 import "reactflow/dist/style.css";
 import style from "./App.module.css";
+
+const hiddenHandle: React.CSSProperties = {
+  width: 1,
+  height: 1,
+  minWidth: 1,
+  border: "none",
+  background: "transparent",
+  opacity: 0,
+  top: 30,
+  left: 30,
+  right: "auto",
+  bottom: "auto",
+  transform: "none",
+};
 
 // Custom Circle Node Component
 const CircleNode = ({
@@ -24,6 +37,7 @@ const CircleNode = ({
     label: string;
     title: string;
     color: string;
+    isConnectingSource: boolean;
     onLabelChange: (id: string, label: string) => void;
   };
   id: string;
@@ -51,57 +65,55 @@ const CircleNode = ({
   };
 
   return (
-    <>
-      <Handle type="target" position={Position.Top} id="top" />
-      <Handle type="target" position={Position.Left} id="left" />
-      <Handle type="target" position={Position.Right} id="right" />
-      <Handle type="target" position={Position.Bottom} id="bottom" />
-      <div
-        style={{
-          width: 60,
-          height: 60,
-          borderRadius: "50%",
-          background: data.color,
-          border: "3px solid #fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#fff",
-          fontWeight: "bold",
-          fontSize: "14px",
-          boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
-        }}
-        title={data.title}
-        onDoubleClick={handleDoubleClick}
-      >
-        {isEditing ? (
-          <input
-            type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            style={{
-              width: "50px",
-              textAlign: "center",
-              background: "transparent",
-              border: "none",
-              color: "#fff",
-              fontWeight: "bold",
-              fontSize: "14px",
-              outline: "none",
-            }}
-          />
-        ) : (
-          data.label
-        )}
-      </div>
-      <Handle type="source" position={Position.Top} id="top-source" />
-      <Handle type="source" position={Position.Left} id="left-source" />
-      <Handle type="source" position={Position.Right} id="right-source" />
-      <Handle type="source" position={Position.Bottom} id="bottom-source" />
-    </>
+    <div
+      style={{
+        position: "relative",
+        width: 60,
+        height: 60,
+        borderRadius: "50%",
+        background: data.color,
+        border: data.isConnectingSource
+          ? "3px solid #ff6600"
+          : "3px solid #fff",
+        boxShadow: data.isConnectingSource
+          ? "0 0 0 3px #ff6600, 0 4px 6px rgba(0,0,0,0.3)"
+          : "0 4px 6px rgba(0,0,0,0.3)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#fff",
+        fontWeight: "bold",
+        fontSize: "14px",
+        cursor: data.isConnectingSource ? "crosshair" : "pointer",
+      }}
+      title={data.title}
+      onDoubleClick={handleDoubleClick}
+    >
+      <Handle type="target" position={Position.Top} style={hiddenHandle} />
+      <Handle type="source" position={Position.Bottom} style={hiddenHandle} />
+      {isEditing ? (
+        <input
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          style={{
+            width: "50px",
+            textAlign: "center",
+            background: "transparent",
+            border: "none",
+            color: "#fff",
+            fontWeight: "bold",
+            fontSize: "14px",
+            outline: "none",
+          }}
+        />
+      ) : (
+        data.label
+      )}
+    </div>
   );
 };
 
@@ -113,6 +125,8 @@ function GraphBuilder() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [nodeIdCounter, setNodeIdCounter] = useState(1);
   const [selectedColor, setSelectedColor] = useState("#667eea");
+  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
+  const connectingFromRef = useRef<string | null>(null);
   const { screenToFlowPosition } = useReactFlow();
 
   const colors = [
@@ -129,26 +143,42 @@ function GraphBuilder() {
         nds.map((node) =>
           node.id === nodeId
             ? { ...node, data: { ...node.data, label: newLabel } }
-            : node
-        )
+            : node,
+        ),
       );
     },
-    [setNodes]
+    [setNodes],
   );
 
-  const onConnect = useCallback(
-    (params: Connection) =>
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      const current = connectingFromRef.current;
+      if (!current) {
+        connectingFromRef.current = node.id;
+        setConnectingFrom(node.id);
+        return;
+      }
+      if (current === node.id) {
+        connectingFromRef.current = null;
+        setConnectingFrom(null);
+        return;
+      }
       setEdges((eds) =>
         addEdge(
           {
-            ...params,
+            id: `e-${current}-${node.id}`,
+            source: current,
+            target: node.id,
             style: { stroke: "#ff6600", strokeWidth: 2 },
             type: "straight",
           },
-          eds
-        )
-      ),
-    [setEdges]
+          eds,
+        ),
+      );
+      connectingFromRef.current = null;
+      setConnectingFrom(null);
+    },
+    [setEdges],
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -177,6 +207,7 @@ function GraphBuilder() {
           label: `${nodeIdCounter}`,
           title: `Node ${nodeIdCounter}`,
           color: color || selectedColor,
+          isConnectingSource: false,
           onLabelChange: handleLabelChange,
         },
       };
@@ -184,7 +215,13 @@ function GraphBuilder() {
       setNodes((nds) => nds.concat(newNode));
       setNodeIdCounter((id) => id + 1);
     },
-    [nodeIdCounter, screenToFlowPosition, setNodes, selectedColor]
+    [
+      nodeIdCounter,
+      screenToFlowPosition,
+      setNodes,
+      selectedColor,
+      handleLabelChange,
+    ],
   );
 
   const onDragStart = (event: React.DragEvent, color: string) => {
@@ -201,7 +238,7 @@ function GraphBuilder() {
         <li>
           Drag a colored node below onto the canvas. Double-click nodes to edit
         </li>
-        <li>Connect nodes by dragging from one node's edge to another.</li>
+        <li>Click a node to start an edge, then click the target node.</li>
         <li>
           To remove a node or connection, click on it then hit the delete key.
         </li>
@@ -226,11 +263,14 @@ function GraphBuilder() {
 
       <div className={style.graphArea} ref={reactFlowWrapper}>
         <ReactFlow
-          nodes={nodes}
+          nodes={nodes.map((n) => ({
+            ...n,
+            data: { ...n.data, isConnectingSource: n.id === connectingFrom },
+          }))}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
+          onNodeClick={onNodeClick}
           onDrop={onDrop}
           onDragOver={onDragOver}
           nodeTypes={nodeTypes}
