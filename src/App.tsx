@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -7,10 +7,20 @@ import ReactFlow, {
   addEdge,
   ReactFlowProvider,
   useReactFlow,
+  useViewport,
   Handle,
   Position,
 } from "reactflow";
 import type { Node, Edge } from "reactflow";
+
+type FreePoint = { x: number; y: number };
+type FreePath = { id: string; points: FreePoint[] };
+
+const toPathD = (pts: FreePoint[]) =>
+  pts.reduce(
+    (d, p, i) => d + (i === 0 ? `M ${p.x} ${p.y}` : ` L ${p.x} ${p.y}`),
+    "",
+  );
 import "reactflow/dist/style.css";
 import style from "./App.module.css";
 
@@ -127,13 +137,34 @@ function GraphBuilder() {
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const connectingFromRef = useRef<string | null>(null);
   const { screenToFlowPosition } = useReactFlow();
+  const { x: vpX, y: vpY, zoom } = useViewport();
+  const [freeDrawMode, setFreeDrawMode] = useState(false);
+  const [freePaths, setFreePaths] = useState<FreePath[]>([]);
+  const [currentPath, setCurrentPath] = useState<FreePoint[] | null>(null);
+  const [selectedFreePathId, setSelectedFreePathId] = useState<string | null>(
+    null,
+  );
+  const isDrawing = useRef(false);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedFreePathId) {
+        setFreePaths((paths) =>
+          paths.filter((p) => p.id !== selectedFreePathId),
+        );
+        setSelectedFreePathId(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [selectedFreePathId]);
 
   const colors = [
     { name: "Purple", value: "#667eea" },
     { name: "Red", value: "#ef4444" },
     { name: "Green", value: "#22c55e" },
     { name: "Blue", value: "#3b82f6" },
-    { name: "Orange", value: "#f97316" },
+    { name: "Orange", value: "#ffe100" },
   ];
 
   const handleLabelChange = useCallback(
@@ -183,12 +214,16 @@ function GraphBuilder() {
   const onEdgeClick = useCallback(
     (_event: React.MouseEvent, edge: Edge) => {
       setEdges((eds) => eds.map((e) => ({ ...e, selected: e.id === edge.id })));
+      connectingFromRef.current = null;
+      setConnectingFrom(null);
     },
     [setEdges],
   );
 
   const onPaneClick = useCallback(() => {
     setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
+    connectingFromRef.current = null;
+    setConnectingFrom(null);
   }, [setEdges]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -240,6 +275,35 @@ function GraphBuilder() {
     setSelectedColor(color);
   };
 
+  const onDrawMouseDown = (e: React.MouseEvent) => {
+    if (!freeDrawMode) return;
+    isDrawing.current = true;
+    connectingFromRef.current = null;
+    setConnectingFrom(null);
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    setCurrentPath([pos]);
+  };
+
+  const onDrawMouseMove = (e: React.MouseEvent) => {
+    if (!freeDrawMode || !isDrawing.current) return;
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    setCurrentPath((prev) => (prev ? [...prev, pos] : [pos]));
+  };
+
+  const onDrawMouseUp = () => {
+    if (!freeDrawMode || !isDrawing.current) return;
+    isDrawing.current = false;
+    setCurrentPath((prev) => {
+      if (prev && prev.length >= 2) {
+        setFreePaths((paths) => [
+          ...paths,
+          { id: `fp-${Date.now()}`, points: prev },
+        ]);
+      }
+      return null;
+    });
+  };
+
   return (
     <div className={style.app}>
       <h1>Craft a Graph</h1>
@@ -269,9 +333,23 @@ function GraphBuilder() {
             +
           </div>
         ))}
+        <button
+          onClick={() => setFreeDrawMode((m) => !m)}
+          style={{
+            background: freeDrawMode ? "#f97316" : undefined,
+            alignSelf: "center",
+          }}
+          title="Toggle free draw mode"
+        >
+          {freeDrawMode ? "✏️ Drawing" : "✏️ Draw"}
+        </button>
       </div>
 
-      <div className={style.graphArea} ref={reactFlowWrapper}>
+      <div
+        className={style.graphArea}
+        ref={reactFlowWrapper}
+        style={{ position: "relative" }}
+      >
         <ReactFlow
           nodes={nodes.map((n) => ({
             ...n,
@@ -285,7 +363,7 @@ function GraphBuilder() {
           }))}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
+          onNodeClick={freeDrawMode ? undefined : onNodeClick}
           onEdgeClick={onEdgeClick}
           onPaneClick={onPaneClick}
           onDrop={onDrop}
@@ -293,10 +371,84 @@ function GraphBuilder() {
           nodeTypes={nodeTypes}
           fitView
           deleteKeyCode={["Delete", "Backspace"]}
+          panOnDrag={!freeDrawMode}
+          nodesDraggable={!freeDrawMode}
         >
           <Background color="#000" gap={20} />
           <Controls />
         </ReactFlow>
+
+        {/* Free-draw SVG overlay — lives in flow-space via viewport transform */}
+        <svg
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            cursor: freeDrawMode ? "crosshair" : "default",
+            zIndex: 10,
+          }}
+        >
+          <g transform={`translate(${vpX}, ${vpY}) scale(${zoom})`}>
+            {/* Capture draw gestures without blocking ReactFlow */}
+            {freeDrawMode && (
+              <rect
+                x={-vpX / zoom}
+                y={-vpY / zoom}
+                width={99999}
+                height={99999}
+                fill="transparent"
+                style={{ pointerEvents: "all" }}
+                onMouseDown={onDrawMouseDown}
+                onMouseMove={onDrawMouseMove}
+                onMouseUp={onDrawMouseUp}
+                onMouseLeave={onDrawMouseUp}
+              />
+            )}
+            {freePaths.map((fp) => (
+              <g
+                key={fp.id}
+                style={{ cursor: "pointer" }}
+                onClick={() =>
+                  setSelectedFreePathId((cur) => (cur === fp.id ? null : fp.id))
+                }
+              >
+                {/* Wide transparent hit area */}
+                <path
+                  d={toPathD(fp.points)}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={12 / zoom}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ pointerEvents: "stroke" }}
+                />
+                {/* Visible stroke */}
+                <path
+                  d={toPathD(fp.points)}
+                  fill="none"
+                  stroke={fp.id === selectedFreePathId ? "#f97316" : "black"}
+                  strokeWidth={2 / zoom}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ pointerEvents: "none" }}
+                />
+              </g>
+            ))}
+            {currentPath && currentPath.length >= 2 && (
+              <path
+                d={toPathD(currentPath)}
+                fill="none"
+                stroke="black"
+                strokeWidth={2 / zoom}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray={`${4 / zoom} ${4 / zoom}`}
+              />
+            )}
+          </g>
+        </svg>
       </div>
     </div>
   );
