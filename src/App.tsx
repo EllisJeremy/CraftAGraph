@@ -1,5 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
-import { flushSync } from "react-dom";
+import { useState, useCallback, useRef } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -8,20 +7,10 @@ import ReactFlow, {
   addEdge,
   ReactFlowProvider,
   useReactFlow,
-  useViewport,
   Handle,
   Position,
 } from "reactflow";
 import type { Node, Edge } from "reactflow";
-
-type FreePoint = { x: number; y: number };
-type FreePath = { id: string; points: FreePoint[] };
-
-const toPathD = (pts: FreePoint[]) =>
-  pts.reduce(
-    (d, p, i) => d + (i === 0 ? `M ${p.x} ${p.y}` : ` L ${p.x} ${p.y}`),
-    "",
-  );
 import "reactflow/dist/style.css";
 import style from "./App.module.css";
 
@@ -39,6 +28,7 @@ const hiddenHandle: React.CSSProperties = {
   transform: "none",
 };
 
+// Custom Circle Node Component
 const CircleNode = ({
   data,
   id,
@@ -75,55 +65,53 @@ const CircleNode = ({
   };
 
   return (
-    <div
-      style={{
-        position: "relative",
-        width: 60,
-        height: 60,
-        borderRadius: "50%",
-        background: data.color,
-        border: data.isConnectingSource
-          ? "3px solid #ff6600"
-          : "3px solid #fff",
-        boxShadow: data.isConnectingSource
-          ? "0 0 0 3px #ff6600, 0 4px 6px rgba(0,0,0,0.3)"
-          : "0 4px 6px rgba(0,0,0,0.3)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#fff",
-        fontWeight: "bold",
-        fontSize: "14px",
-        cursor: data.isConnectingSource ? "crosshair" : "pointer",
-      }}
-      title={data.title}
-      onDoubleClick={handleDoubleClick}
-    >
+      <div
+        style={{
+          position: "relative",
+          width: 60,
+          height: 60,
+          borderRadius: "50%",
+          background: data.color,
+          border: data.isConnectingSource ? "3px solid #ff6600" : "3px solid #fff",
+          boxShadow: data.isConnectingSource
+            ? "0 0 0 3px #ff6600, 0 4px 6px rgba(0,0,0,0.3)"
+            : "0 4px 6px rgba(0,0,0,0.3)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          fontWeight: "bold",
+          fontSize: "14px",
+          cursor: data.isConnectingSource ? "crosshair" : "pointer",
+        }}
+        title={data.title}
+        onDoubleClick={handleDoubleClick}
+      >
       <Handle type="target" position={Position.Top} style={hiddenHandle} />
       <Handle type="source" position={Position.Bottom} style={hiddenHandle} />
-      {isEditing ? (
-        <input
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          style={{
-            width: "50px",
-            textAlign: "center",
-            background: "transparent",
-            border: "none",
-            color: "#fff",
-            fontWeight: "bold",
-            fontSize: "14px",
-            outline: "none",
-          }}
-        />
-      ) : (
-        data.label
-      )}
-    </div>
+        {isEditing ? (
+          <input
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            style={{
+              width: "50px",
+              textAlign: "center",
+              background: "transparent",
+              border: "none",
+              color: "#fff",
+              fontWeight: "bold",
+              fontSize: "14px",
+              outline: "none",
+            }}
+          />
+        ) : (
+          data.label
+        )}
+      </div>
   );
 };
 
@@ -138,56 +126,13 @@ function GraphBuilder() {
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const connectingFromRef = useRef<string | null>(null);
   const { screenToFlowPosition } = useReactFlow();
-  const { x: vpX, y: vpY, zoom } = useViewport();
-  const [freeDrawMode, setFreeDrawMode] = useState(false);
-  const [freePaths, setFreePaths] = useState<FreePath[]>([]);
-  const [currentPath, setCurrentPath] = useState<FreePoint[] | null>(null);
-  const [selectedFreePathId, setSelectedFreePathId] = useState<string | null>(
-    null,
-  );
-  const selectedFreePathIdRef = useRef<string | null>(null);
-  selectedFreePathIdRef.current = selectedFreePathId;
-  const isDrawing = useRef(false);
-
-  useEffect(() => {
-    const isTyping = () => document.activeElement?.tagName === "INPUT";
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (isTyping()) return;
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedFreePathIdRef.current) {
-        const id = selectedFreePathIdRef.current;
-        setFreePaths((paths) => paths.filter((p) => p.id !== id));
-        setSelectedFreePathId(null);
-      }
-      if (e.key === "d" && !e.repeat) {
-        setFreeDrawMode(true);
-      }
-    };
-
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === "d") {
-        isDrawing.current = false;
-        flushSync(() => {
-          setFreeDrawMode(false);
-          setCurrentPath(null);
-        });
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("keyup", onKeyUp);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("keyup", onKeyUp);
-    };
-  }, []);
 
   const colors = [
     { name: "Purple", value: "#667eea" },
     { name: "Red", value: "#ef4444" },
     { name: "Green", value: "#22c55e" },
     { name: "Blue", value: "#3b82f6" },
-    { name: "Orange", value: "#ffe100" },
+    { name: "Orange", value: "#f97316" },
   ];
 
   const handleLabelChange = useCallback(
@@ -205,7 +150,6 @@ function GraphBuilder() {
 
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      setSelectedFreePathId(null);
       const current = connectingFromRef.current;
       if (!current) {
         connectingFromRef.current = node.id;
@@ -223,7 +167,7 @@ function GraphBuilder() {
             id: `e-${current}-${node.id}`,
             source: current,
             target: node.id,
-            style: { stroke: "#000", strokeWidth: 2 },
+            style: { stroke: "#ff6600", strokeWidth: 2 },
             type: "straight",
           },
           eds,
@@ -233,59 +177,6 @@ function GraphBuilder() {
       setConnectingFrom(null);
     },
     [setEdges],
-  );
-
-  const onEdgeClick = useCallback(
-    (_event: React.MouseEvent, edge: Edge) => {
-      setEdges((eds) => eds.map((e) => ({ ...e, selected: e.id === edge.id })));
-      connectingFromRef.current = null;
-      setConnectingFrom(null);
-      setSelectedFreePathId(null);
-    },
-    [setEdges],
-  );
-
-  const onPaneClick = useCallback(() => {
-    setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
-    connectingFromRef.current = null;
-    setConnectingFrom(null);
-    setSelectedFreePathId(null);
-  }, [setEdges]);
-
-  const onNodeDragStop = useCallback(
-    (_event: React.MouseEvent, draggedNode: Node) => {
-      const THRESHOLD = 50; // flow-space px — how close a path point must be to a node center
-      const nodeCenter = (n: Node) => ({ x: n.position.x + 30, y: n.position.y + 30 });
-      const pathNear = (fp: FreePath, pt: { x: number; y: number }) =>
-        fp.points.some((p) => Math.hypot(p.x - pt.x, p.y - pt.y) < THRESHOLD);
-
-      const draggedCenter = nodeCenter(draggedNode);
-      const toRemove: string[] = [];
-      const newEdges: Parameters<typeof addEdge>[0][] = [];
-
-      for (const fp of freePaths) {
-        if (!pathNear(fp, draggedCenter)) continue;
-        const other = nodes.find(
-          (n) => n.id !== draggedNode.id && pathNear(fp, nodeCenter(n)),
-        );
-        if (other) {
-          toRemove.push(fp.id);
-          newEdges.push({
-            id: `e-${draggedNode.id}-${other.id}`,
-            source: draggedNode.id,
-            target: other.id,
-            style: { stroke: "#000", strokeWidth: 2 },
-            type: "straight",
-          });
-        }
-      }
-
-      if (toRemove.length > 0)
-        setFreePaths((paths) => paths.filter((p) => !toRemove.includes(p.id)));
-      if (newEdges.length > 0)
-        setEdges((eds) => newEdges.reduce((acc, e) => addEdge(e, acc), eds));
-    },
-    [freePaths, nodes, setEdges],
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -322,48 +213,13 @@ function GraphBuilder() {
       setNodes((nds) => nds.concat(newNode));
       setNodeIdCounter((id) => id + 1);
     },
-    [
-      nodeIdCounter,
-      screenToFlowPosition,
-      setNodes,
-      selectedColor,
-      handleLabelChange,
-    ],
+    [nodeIdCounter, screenToFlowPosition, setNodes, selectedColor, handleLabelChange],
   );
 
   const onDragStart = (event: React.DragEvent, color: string) => {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("application/reactflow-color", color);
     setSelectedColor(color);
-  };
-
-  const onDrawMouseDown = (e: React.MouseEvent) => {
-    if (!freeDrawMode) return;
-    isDrawing.current = true;
-    connectingFromRef.current = null;
-    setConnectingFrom(null);
-    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    setCurrentPath([pos]);
-  };
-
-  const onDrawMouseMove = (e: React.MouseEvent) => {
-    if (!freeDrawMode || !isDrawing.current) return;
-    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    setCurrentPath((prev) => (prev ? [...prev, pos] : [pos]));
-  };
-
-  const onDrawMouseUp = () => {
-    if (!freeDrawMode || !isDrawing.current) return;
-    isDrawing.current = false;
-    setCurrentPath((prev) => {
-      if (prev && prev.length >= 2) {
-        setFreePaths((paths) => [
-          ...paths,
-          { id: `fp-${Date.now()}`, points: prev },
-        ]);
-      }
-      return null;
-    });
   };
 
   return (
@@ -378,7 +234,6 @@ function GraphBuilder() {
         <li>
           To remove a node or connection, click on it then hit the delete key.
         </li>
-        <li>Hold <strong>D</strong> to free-draw annotation lines.</li>
       </ul>
 
       <div className={style.colorNodes}>
@@ -398,111 +253,25 @@ function GraphBuilder() {
         ))}
       </div>
 
-      <div
-        className={style.graphArea}
-        ref={reactFlowWrapper}
-        style={{ position: "relative" }}
-      >
+      <div className={style.graphArea} ref={reactFlowWrapper}>
         <ReactFlow
           nodes={nodes.map((n) => ({
             ...n,
             data: { ...n.data, isConnectingSource: n.id === connectingFrom },
           }))}
-          edges={edges.map((e) => ({
-            ...e,
-            style: e.selected
-              ? { stroke: "#f97316", strokeWidth: 3 }
-              : { stroke: "#000", strokeWidth: 2 },
-          }))}
+          edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeClick={freeDrawMode ? undefined : onNodeClick}
-          onNodeDragStop={onNodeDragStop}
-          onEdgeClick={onEdgeClick}
-          onPaneClick={onPaneClick}
+          onNodeClick={onNodeClick}
           onDrop={onDrop}
           onDragOver={onDragOver}
           nodeTypes={nodeTypes}
           fitView
-          deleteKeyCode={["Delete", "Backspace"]}
-          panOnDrag={!freeDrawMode}
-          nodesDraggable={!freeDrawMode}
+          deleteKeyCode="Delete"
         >
           <Background color="#000" gap={20} />
           <Controls />
         </ReactFlow>
-
-        {/* Free-draw SVG overlay — lives in flow-space via viewport transform */}
-        <svg
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            pointerEvents: "none",
-            cursor: freeDrawMode ? "crosshair" : "default",
-            zIndex: 10,
-          }}
-        >
-          <g transform={`translate(${vpX}, ${vpY}) scale(${zoom})`}>
-            {/* Capture draw gestures without blocking ReactFlow */}
-            {freeDrawMode && (
-              <rect
-                x={-vpX / zoom}
-                y={-vpY / zoom}
-                width={99999}
-                height={99999}
-                fill="transparent"
-                style={{ pointerEvents: "all" }}
-                onMouseDown={onDrawMouseDown}
-                onMouseMove={onDrawMouseMove}
-                onMouseUp={onDrawMouseUp}
-                onMouseLeave={onDrawMouseUp}
-              />
-            )}
-            {freePaths.map((fp) => (
-              <g
-                key={fp.id}
-                style={{ cursor: freeDrawMode ? "crosshair" : "pointer" }}
-                onClick={() =>
-                  setSelectedFreePathId((cur) => (cur === fp.id ? null : fp.id))
-                }
-              >
-                {/* Wide transparent hit area */}
-                <path
-                  d={toPathD(fp.points)}
-                  fill="none"
-                  stroke="transparent"
-                  strokeWidth={12 / zoom}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ pointerEvents: freeDrawMode ? "none" : "stroke" }}
-                />
-                {/* Visible stroke */}
-                <path
-                  d={toPathD(fp.points)}
-                  fill="none"
-                  stroke={fp.id === selectedFreePathId ? "#f97316" : "black"}
-                  strokeWidth={2 / zoom}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ pointerEvents: "none" }}
-                />
-              </g>
-            ))}
-            {currentPath && currentPath.length >= 2 && (
-              <path
-                d={toPathD(currentPath)}
-                fill="none"
-                stroke="black"
-                strokeWidth={2 / zoom}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeDasharray={`${4 / zoom} ${4 / zoom}`}
-              />
-            )}
-          </g>
-        </svg>
       </div>
     </div>
   );
