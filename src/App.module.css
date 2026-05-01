@@ -10,18 +10,33 @@ h1 {
   margin: 10px 0;
 }
 
-button {
-  margin: 10px auto;
-  padding: 8px 16px;
-  background-color: #0077ff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+.toggleRow {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 8px;
 }
 
-button:hover {
-  background-color: #005fcc;
+.toggle {
+  padding: 4px 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 20px;
+  background: white;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.toggle:hover {
+  border-color: #a5b4fc;
+}
+
+.toggleActive {
+  border-color: #667eea;
+  background: #667eea;
+  color: white;
 }
 
 .graphArea {
