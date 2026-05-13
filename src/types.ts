@@ -3,5 +3,5 @@ export type FreePath = { id: string; points: FreePoint[] };
 
 export type CustomEdgeData = {
   weight: number;
-  onWeightChange: (id: string, weight: number) => void;
+  onWeightChange?: (id: string, weight: number) => void;
 };

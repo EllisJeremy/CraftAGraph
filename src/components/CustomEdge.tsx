@@ -49,7 +49,7 @@ export default function CustomEdge({
   const commitEdit = () => {
     setIsEditing(false);
     const num = parseFloat(editValue);
-    if (!isNaN(num)) data?.onWeightChange(id, num);
+    if (!isNaN(num)) data?.onWeightChange?.(id, num);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

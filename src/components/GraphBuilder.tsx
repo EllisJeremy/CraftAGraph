@@ -8,7 +8,8 @@ import ReactFlow, {
   useReactFlow,
   useViewport,
 } from "reactflow";
-import type { Node, Edge } from "reactflow";
+import type { Node } from "reactflow";
+import type { CustomEdgeData } from "../types";
 import "reactflow/dist/style.css";
 
 import CircleNode from "./CircleNode";
@@ -26,7 +27,7 @@ const edgeTypes = { custom: CustomEdge };
 export default function GraphBuilder() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<CustomEdgeData>([]);
   const [nodeIdCounter, setNodeIdCounter] = useState(1);
   const [selectedColor, setSelectedColor] = useState("#667eea");
   const [showWeights, setShowWeights] = useState(false);
@@ -76,11 +77,15 @@ export default function GraphBuilder() {
   const onNodeDragStart = useCallback(
     (_event: React.MouseEvent, draggedNode: Node) => {
       const THRESHOLD = 50;
-      const nodeCenter = (n: Node) => ({ x: n.position.x + 30, y: n.position.y + 30 });
+      const nodeCenter = (n: Node) => ({
+        x: n.position.x + 30,
+        y: n.position.y + 30,
+      });
       const pathNear = (
         fp: { points: { x: number; y: number }[] },
         pt: { x: number; y: number },
-      ) => fp.points.some((p) => Math.hypot(p.x - pt.x, p.y - pt.y) < THRESHOLD);
+      ) =>
+        fp.points.some((p) => Math.hypot(p.x - pt.x, p.y - pt.y) < THRESHOLD);
 
       const draggedCenter = nodeCenter(draggedNode);
       const toRemove: string[] = [];
@@ -121,7 +126,10 @@ export default function GraphBuilder() {
       event.preventDefault();
       if (!reactFlowWrapper.current) return;
       const color = event.dataTransfer.getData("application/reactflow-color");
-      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
       const newNode: Node = {
         id: `node-${nodeIdCounter}`,
         type: "circle",
@@ -137,7 +145,13 @@ export default function GraphBuilder() {
       setNodes((nds) => nds.concat(newNode));
       setNodeIdCounter((id) => id + 1);
     },
-    [nodeIdCounter, screenToFlowPosition, setNodes, selectedColor, handleLabelChange],
+    [
+      nodeIdCounter,
+      screenToFlowPosition,
+      setNodes,
+      selectedColor,
+      handleLabelChange,
+    ],
   );
 
   const onDragStart = (event: React.DragEvent, color: string) => {
@@ -151,10 +165,14 @@ export default function GraphBuilder() {
       <div className={style.app}>
         <h1>Craft a Graph</h1>
         <ul className={style.instructions}>
-          <li>Drag a colored node onto the canvas. Double-click nodes to rename.</li>
+          <li>
+            Drag a colored node onto the canvas. Double-click nodes to rename.
+          </li>
           <li>Click a node to start an edge, then click the target node.</li>
           <li>Click a node or edge then hit Delete to remove it.</li>
-          <li>Hold <strong>D</strong> to free-draw annotation lines.</li>
+          <li>
+            Hold <strong>D</strong> to free-draw annotation lines.
+          </li>
         </ul>
 
         <div className={style.toggleRow}>
@@ -174,7 +192,11 @@ export default function GraphBuilder() {
 
         <ColorPalette onDragStart={onDragStart} />
 
-        <div className={style.graphArea} ref={reactFlowWrapper} style={{ position: "relative" }}>
+        <div
+          className={style.graphArea}
+          ref={reactFlowWrapper}
+          style={{ position: "relative" }}
+        >
           <ReactFlow
             nodes={nodes.map((n) => ({
               ...n,
@@ -211,7 +233,9 @@ export default function GraphBuilder() {
             onDrawMouseDown={onDrawMouseDown}
             onDrawMouseMove={onDrawMouseMove}
             onDrawMouseUp={onDrawMouseUp}
-            onSelectPath={(id) => setSelectedFreePathId((cur) => (cur === id ? null : id))}
+            onSelectPath={(id) =>
+              setSelectedFreePathId((cur) => (cur === id ? null : id))
+            }
           />
         </div>
       </div>
